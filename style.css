@@ -1,0 +1,225 @@
+:root {
+    --bg-color: #f5f7fa;
+    --card-bg: #ffffff;
+    --text-primary: #2d3748;
+    --text-secondary: #718096;
+    --accent-blue: #3182ce;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    margin: 0;
+    padding: 20px;
+    line-height: 1.5;
+}
+
+.container {
+    max-width: 1400px;
+    /* Increased width */
+    margin: 0 auto;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    /* Reduced margin */
+}
+
+h1 {
+    font-size: 2.2rem;
+    /* Slightly smaller title */
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+p {
+    color: var(--text-secondary);
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    /* Increased min-width for larger charts */
+    gap: 30px;
+}
+
+.chart-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease;
+}
+
+.chart-card:hover {
+    transform: translateY(-2px);
+}
+
+h2 {
+    font-size: 1.25rem;
+    color: var(--text-primary);
+    margin-top: 0;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #edf2f7;
+    padding-bottom: 10px;
+}
+
+canvas {
+    width: 100% !important;
+    height: auto !important;
+}
+
+@media (max-width: 600px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    h1 {
+        font-size: 1.8rem;
+    }
+}
+
+.card-section {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    margin-top: 30px;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.85rem;
+    /* Smaller font size for compact table */
+}
+
+th,
+td {
+    text-align: center;
+    padding: 8px 10px;
+    /* Reduced padding */
+    border-bottom: 1px solid #edf2f7;
+    white-space: nowrap;
+    /* Prevent wrapping */
+}
+
+th {
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background-color: #f8fafc;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tr:hover {
+    background-color: #f7fafc;
+}
+
+td input[type="number"] {
+    width: 90%;
+    padding: 4px;
+    /* Reduced padding */
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    text-align: center;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    background: transparent;
+}
+
+td input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+}
+
+/* Remove Arrows/Spinners from Number Input */
+td input[type="number"]::-webkit-inner-spin-button,
+td input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+td input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.interpolated-input {
+    color: #ed8936 !important;
+    /* Orange */
+    font-weight: bold;
+    background-color: #fffaf0;
+    /* Light Orange Background */
+    border-color: #fbd38d !important;
+}
+
+.footnote {
+    margin-top: 15px;
+    font-size: 0.9rem;
+    color: #ed8936;
+    background-color: #fffaf0;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #fbd38d;
+}
+
+.primary-button {
+    background-color: var(--accent-blue);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-weight: 600;
+}
+
+.primary-button:hover {
+    background-color: #2b6cb0;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 10px;
+}
+
+.tab-button {
+    background: transparent;
+    border: none;
+    padding: 8px 16px;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.tab-button:hover {
+    background-color: #edf2f7;
+    color: var(--text-primary);
+}
+
+.tab-button.active {
+    background-color: var(--accent-blue);
+    color: white;
+}
