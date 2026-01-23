@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot AI - Future Tech</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#about">About</a>
+            <a href="#contact" class="btn-primary">Get Access</a>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Welcome to <br><span class="gradient-text">Suklae's Home Utility Price Tracker</span></h1>
+                <p>Experience the future of automation with our advanced AI-driven robotics solutions. Seamlessly
+                    integrated, beautifully designed.</p>
+                <div class="cta-group">
+                    <button class="btn-primary">로그인</button>
+                </div>
+            </div>
+            <div class="spline-container">
+                <iframe src='https://my.spline.design/r4xbot-Eh40QDkikcEogtX8UA2VpP3S/' frameborder='0' width='100%'
+                    height='100%'></iframe>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <div class="feature-card">
+                <h3>AI Powered</h3>
+                <p>Advanced neural networks processing real-time data for precise movements.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Cloud Sync</h3>
+                <p>Seamless synchronization across all your devices and control units.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Secure Core</h3>
+                <p>Military-grade encryption ensuring your operational data remains safe.</p>
+            </div>
+        </section>
+    </main>
+
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Login</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">ID</label>
+                    <input type="text" id="username" name="username" value="suklae" placeholder="Enter your ID">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" name="password" placeholder="Enter your Password">
+                        <span id="passwordToggle" class="password-toggle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </span>
+                    </div>
+                </div>
+                <div id="loginError" class="error-msg"></div>
+                <button type="submit" class="btn-primary">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
