@@ -768,6 +768,33 @@ function init() {
     document.getElementById('loadBtn').addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', importData);
 
+    // Logout Logic
+    const logoutBtn = document.getElementById('logoutBtn');
+    const logoutModal = document.getElementById('logoutModal');
+    const confirmBtn = document.getElementById('confirmLogout');
+    const cancelBtn = document.getElementById('cancelLogout');
+
+    if (logoutBtn && logoutModal) {
+        logoutBtn.onclick = function () {
+            logoutModal.style.display = "flex";
+        };
+
+        confirmBtn.onclick = function () {
+            window.location.href = '../landing-page-robot/index.html';
+        };
+
+        cancelBtn.onclick = function () {
+            logoutModal.style.display = "none";
+        };
+
+        // Close on outside click
+        window.onclick = function (event) {
+            if (event.target == logoutModal) {
+                logoutModal.style.display = "none";
+            }
+        };
+    }
+
     // Helper to create average dataset config
     const createAvgDataset = (label, color) => ({
         type: 'line',

@@ -12,6 +12,7 @@
 <body>
     <div class="container">
         <header>
+            <button id="logoutBtn" class="logout-button">Log out</button>
             <h1>전기,물,가스 사용현황 2025</h1>
             <p>월별 전기, 수도, 가스 사용량 그래프</p>
         </header>
@@ -70,7 +71,18 @@
             </p>
         </div>
     </div>
-    <script src="app.js?v=1.8"></script>
+    <div id="logoutModal" class="modal">
+        <div class="modal-content">
+            <h2>Log Out</h2>
+            <p>Are you sure you want to log out?</p>
+            <div class="modal-actions">
+                <button id="confirmLogout" class="primary-button">Yes, Log Out</button>
+                <button id="cancelLogout" class="secondary-button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=1.10"></script>
 </body>
 
 </html>
