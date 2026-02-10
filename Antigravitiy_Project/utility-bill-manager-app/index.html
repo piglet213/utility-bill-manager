@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>공과금 매니저</title>
+    <meta name="theme-color" content="#ffffff">
+    <meta name="description" content="안드로이드 스타일 공과금 관리 앱">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+    <!-- Material Icons & Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Top App Bar (Optional, can be hidden on scroll) -->
+        <header class="top-app-bar">
+            <h1 id="pageTitle">대시보드</h1>
+            <button class="icon-button" id="refreshBtn">
+                <span class="material-icons-round">refresh</span>
+            </button>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="mainContent" class="content-area">
+            <!-- Views will be injected here by app.js -->
+            <div id="view-dashboard" class="view active">
+                <div class="summary-card">
+                    <h2>이번 달 예상</h2>
+                    <p class="summary-amount">₩ --,---</p>
+                    <div class="summary-details">
+                        <span>전기: --</span>
+                        <span>수도: --</span>
+                        <span>가스: --</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-charts" class="view" style="display: none;">
+                <!-- Chart content -->
+            </div>
+
+            <div id="view-data" class="view" style="display: none;">
+                <!-- Data table content -->
+            </div>
+
+            <div id="view-settings" class="view" style="display: none;">
+                <!-- Settings content -->
+            </div>
+        </main>
+
+        <!-- Bottom Navigation Bar -->
+        <nav class="bottom-nav">
+            <a href="#dashboard" class="nav-item active" data-target="view-dashboard">
+                <span class="material-icons-round">dashboard</span>
+                <span class="nav-label">대시보드</span>
+            </a>
+            <a href="#charts" class="nav-item" data-target="view-charts">
+                <span class="material-icons-round">bar_chart</span>
+                <span class="nav-label">차트</span>
+            </a>
+            <a href="#data" class="nav-item" data-target="view-data">
+                <span class="material-icons-round">table_view</span>
+                <span class="nav-label">데이터</span>
+            </a>
+            <a href="#settings" class="nav-item" data-target="view-settings">
+                <span class="material-icons-round">settings</span>
+                <span class="nav-label">설정</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Floating Action Button (FAB) - Visible only on Data view -->
+    <button id="fab" class="fab" style="display: none;">
+        <span class="material-icons-round">add</span>
+    </button>
+
+    <!-- Scripts -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <script src="app.js"></script>
+    <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW setup failed', err));
+            });
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,273 @@
+:root {
+    /* M3-ish Color Palette */
+    --md-sys-color-primary: #006495;
+    --md-sys-color-on-primary: #ffffff;
+    --md-sys-color-primary-container: #cbe6ff;
+    --md-sys-color-on-primary-container: #001e30;
+    --md-sys-color-secondary: #50606e;
+    --md-sys-color-on-secondary: #ffffff;
+    --md-sys-color-secondary-container: #d3e4f5;
+    --md-sys-color-background: #f8fdff;
+    --md-sys-color-on-background: #001f25;
+    --md-sys-color-surface: #f8fdff;
+    --md-sys-color-on-surface: #001f25;
+    --md-sys-color-surface-variant: #dee3eb;
+    --md-sys-color-on-surface-variant: #41474d;
+    --md-sys-color-outline: #72787e;
+
+    /* Elevations */
+    --elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+    --elevation-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+    --elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px 0px rgba(0, 0, 0, 0.3);
+
+    --bottom-nav-height: 56px;
+    /* Android standard is 80px usually but 56 is web compat */
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--md-sys-color-background);
+    color: var(--md-sys-color-on-background);
+    height: 100vh;
+    overflow: hidden;
+    /* Prevent body scroll, handle in main */
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Top App Bar */
+.top-app-bar {
+    background-color: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    box-shadow: var(--elevation-1);
+    z-index: 10;
+}
+
+.top-app-bar h1 {
+    font-size: 22px;
+    margin: 0;
+    font-weight: 500;
+}
+
+.icon-button {
+    background: none;
+    border: none;
+    color: var(--md-sys-color-on-surface-variant);
+    padding: 12px;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.icon-button:active {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Main Content */
+.content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    padding-bottom: 80px;
+    /* Space for FAB */
+    position: relative;
+}
+
+.view {
+    display: none;
+}
+
+.view.active {
+    display: block;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Cards */
+.summary-card {
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: var(--elevation-1);
+    margin-bottom: 16px;
+}
+
+.summary-card h2 {
+    font-size: 16px;
+    margin: 0 0 8px 0;
+    opacity: 0.8;
+}
+
+.summary-amount {
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+}
+
+.summary-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* Bottom Nav */
+.bottom-nav {
+    background-color: var(--md-sys-color-surface);
+    height: 80px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
+    z-index: 20;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: var(--md-sys-color-on-surface-variant);
+    padding: 8px 16px;
+    border-radius: 16px;
+    transition: all 0.2s ease;
+}
+
+.nav-item .material-icons-round {
+    font-size: 24px;
+    margin-bottom: 4px;
+    background-color: transparent;
+    padding: 4px 20px;
+    border-radius: 16px;
+    transition: background-color 0.2s ease;
+}
+
+.nav-item.active {
+    color: var(--md-sys-color-on-surface);
+}
+
+.nav-item.active .material-icons-round {
+    background-color: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+}
+
+.nav-label {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* FAB */
+.fab {
+    position: absolute;
+    bottom: 96px;
+    /* Above bottom nav */
+    right: 16px;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    border: none;
+    box-shadow: var(--elevation-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+    z-index: 30;
+}
+
+.fab:active {
+    transform: scale(0.95);
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+/* Input Group for OCR */
+.input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.input-wrapper {
+    flex: 1;
+}
+
+.icon-btn {
+    background: transparent;
+    border: 1px solid var(--md-sys-color-outline);
+    border-radius: 8px; /* Square with rounded corners */
+    width: 44px;
+    height: 44px; /* Match standard input height approx */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--md-sys-color-primary);
+    padding: 0;
+    margin-top: 18px; /* Align with input field, skipping label */
+}
+
+.icon-btn:active {
+    background-color: rgba(0, 108, 92, 0.1);
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    z-index: 2000;
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+.spinner {
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top: 4px solid #fff;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
