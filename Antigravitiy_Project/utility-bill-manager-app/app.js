@@ -648,36 +648,86 @@ function openEditModal(index) {
 
         // Show Loading
         loadingOverlay.style.display = 'flex';
+        loadingOverlay.querySelector('div:nth-child(2)').textContent = '이미지 전처리 중...';
 
         try {
-            // Tesseract
-            const displayOverlay = loadingOverlay;
-            const worker = await Tesseract.createWorker('eng'); // Numbers are English
+            // 1. Image Preprocessing with Canvas
+            // Create a bitmap from the file
+            const bitmap = await createImageBitmap(file);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
 
-            const ret = await worker.recognize(file);
-            console.log(ret.data.text);
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            ctx.drawImage(bitmap, 0, 0);
 
-            // Extract number: find the first sequence that looks like a number
-            // Remove all non-digits and non-dots, attempt to parse
-            // Simple approach: Match standard float regex
-            const text = ret.data.text.replace(/,/g, '.'); // Europe decimals often use comma
-            const matches = text.match(/\d+(\.\d+)?/g);
+            // Get image data
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            // Grayscale & Contrast
+            // Simple approach: Convert to grayscale, then maximize contrast
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                // Grayscale (weighted)
+                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+
+                // Contrast increase (Thresholding can be better, but let's try contrast first)
+                // Or simple binarization: if gray > 128 ? 255 : 0;
+                // Let's try simple binarization for clear numbers
+                gray = gray > 140 ? 255 : 0;
+
+                data[i] = gray;
+                data[i + 1] = gray;
+                data[i + 2] = gray;
+            }
+            ctx.putImageData(imageData, 0, 0);
+
+            // Convert canvas back to blob/url for Tesseract
+            const processedImage = canvas.toDataURL('image/png');
+
+            loadingOverlay.querySelector('div:nth-child(2)').textContent = '숫자 인식 중...';
+
+            // 2. Tesseract with Whitelist
+            const worker = await Tesseract.createWorker('eng');
+
+            // Set parameters to only recognize numbers and decimals
+            await worker.setParameters({
+                tessedit_char_whitelist: '0123456789.,'
+            });
+
+            const ret = await worker.recognize(processedImage);
+            console.log('Raw OCR Text:', ret.data.text);
+
+            // 3. Post-processing
+            // Replace comma with dot
+            const text = ret.data.text.replace(/,/g, '.');
+
+            // Extract numbers matching pattern (start or after space/newline, digits+dot+digits)
+            // Filter out noise like independent dots or tiny fragments
+            const matches = text.match(/[\d]+(\.[\d]+)?/g);
 
             if (matches && matches.length > 0) {
-                // Find the longest number or valid looking one?
-                // Usually meter readings are long. Let's take the longest match.
-                const validNum = matches.sort((a, b) => b.length - a.length)[0];
+                // Sort by length descending, assuming the meter reading is the longest number segment
+                // Also can filter by reasonable value range if known, but for now length is a good heuristic
+                const validNums = matches.filter(n => n.length >= 1 && n !== '.').sort((a, b) => b.length - a.length);
 
-                if (validNum && currentTargetInputId) {
-                    const input = modal.querySelector(`#${currentTargetInputId}`);
-                    if (input) {
-                        input.value = validNum;
-                        // Flash effect
-                        input.style.backgroundColor = '#e8f5e9';
-                        setTimeout(() => input.style.backgroundColor = '#fff', 500);
+                if (validNums.length > 0) {
+                    const bestMatch = validNums[0];
+
+                    if (currentTargetInputId) {
+                        const input = modal.querySelector(`#${currentTargetInputId}`);
+                        if (input) {
+                            input.value = bestMatch;
+                            // Visual Feedback
+                            input.style.backgroundColor = '#e8f5e9';
+                            setTimeout(() => input.style.backgroundColor = '#fff', 500);
+                        }
                     }
                 } else {
-                    alert('숫자를 인식하지 못했습니다.');
+                    alert('유효한 숫자를 찾지 못했습니다.');
                 }
             } else {
                 alert('숫자를 인식하지 못했습니다.');
