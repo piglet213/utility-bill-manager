@@ -790,8 +790,8 @@ function openEditModal(index) {
                 const sizeLabel = loadingOverlay.querySelector('#ocrDebugSizeLabel');
                 if (sizeLabel) sizeLabel.textContent = `크롭 크기: ${rawW} × ${rawH}px${canvasRaw.height > canvasRaw.width ? ' (자동 회전)' : ''}`;
 
-                // Scale up to TARGET_W (at least 900px wide) for Tesseract
-                const TARGET_W = 900;
+                // Scale up to at least 1500px wide — larger images fix Tesseract's internal DPI issues
+                const TARGET_W = 1500;
                 const SCALE = Math.max(TARGET_W / rawW, 1);
                 const W = Math.round(rawW * SCALE);
                 const H = Math.round(rawH * SCALE);
@@ -846,16 +846,16 @@ function openEditModal(index) {
 
                 const worker = await Tesseract.createWorker('eng');
 
-                // 6 attempts: PSM7 + PSM13 (raw line), with inverted / grayscale / color
-                // PSM13 bypasses Tesseract's internal line-finding heuristics (better for low-res crops)
-                // Inverted = white-on-dark meter → black-on-white (Tesseract's expected format)
+                // Attempts: PSM13 (raw line, no line-finding) + PSM8 (single word)
+                // PSM7 removed — it triggers internal Tesseract segmentation errors on meter images
+                // user_defined_dpi:300 prevents "Image too small to scale" from Tesseract 72dpi assumption
                 const attempts = [
-                    { img: imgInverted,  psm: '7',  label: 'inv+PSM7'   },
                     { img: imgInverted,  psm: '13', label: 'inv+PSM13'  },
-                    { img: imgGrayscale, psm: '7',  label: 'gray+PSM7'  },
+                    { img: imgInverted,  psm: '8',  label: 'inv+PSM8'   },
                     { img: imgGrayscale, psm: '13', label: 'gray+PSM13' },
-                    { img: imgUpscaled,  psm: '7',  label: 'color+PSM7' },
+                    { img: imgGrayscale, psm: '8',  label: 'gray+PSM8'  },
                     { img: imgUpscaled,  psm: '13', label: 'color+PSM13'},
+                    { img: imgUpscaled,  psm: '8',  label: 'color+PSM8' },
                 ];
 
                 const extractNumber = (rawText) => {
@@ -870,9 +870,9 @@ function openEditModal(index) {
 
                 for (const attempt of attempts) {
                     await worker.setParameters({
-                        // Digits only - no dot, so Tesseract won't insert fake decimal points between slots
                         tessedit_char_whitelist: '0123456789',
-                        tessedit_pageseg_mode: attempt.psm
+                        tessedit_pageseg_mode: attempt.psm,
+                        user_defined_dpi: '300'
                     });
                     const res = await worker.recognize(attempt.img);
                     const num = extractNumber(res.data.text);
