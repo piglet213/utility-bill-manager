@@ -646,102 +646,178 @@ function openEditModal(index) {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Show Loading
-        loadingOverlay.style.display = 'flex';
-        loadingOverlay.querySelector('div:nth-child(2)').textContent = '이미지 전처리 중...';
+        // Create Crop Modal
+        let cropModal = document.getElementById('cropModal');
+        if (!cropModal) {
+            cropModal = document.createElement('div');
+            cropModal.id = 'cropModal';
+            cropModal.className = 'crop-modal';
+            document.body.appendChild(cropModal);
+        }
 
-        try {
-            // 1. Image Preprocessing with Canvas
-            // Create a bitmap from the file
-            const bitmap = await createImageBitmap(file);
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+        const imageUrl = URL.createObjectURL(file);
+        cropModal.innerHTML = `
+            <div class="crop-header">
+                <h3>계량기 숫자 크롭</h3>
+                <p>숫자가 있는 지시부 영역만 마우스나 터치로 지정해 주세요</p>
+            </div>
+            <div class="crop-container">
+                <img id="cropImage" src="${imageUrl}">
+            </div>
+            <div class="crop-footer">
+                <button type="button" class="crop-cancel-btn" id="cropCancel">취소</button>
+                <button type="button" class="crop-confirm-btn" id="cropConfirm">인식 시작</button>
+            </div>
+        `;
 
-            canvas.width = bitmap.width;
-            canvas.height = bitmap.height;
-            ctx.drawImage(bitmap, 0, 0);
+        const cropImage = cropModal.querySelector('#cropImage');
+        let cropper;
 
-            // Get image data
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-
-            // Grayscale & Contrast
-            // Simple approach: Convert to grayscale, then maximize contrast
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                // Grayscale (weighted)
-                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
-
-                // Contrast increase (Thresholding can be better, but let's try contrast first)
-                // Or simple binarization: if gray > 128 ? 255 : 0;
-                // Let's try simple binarization for clear numbers
-                gray = gray > 140 ? 255 : 0;
-
-                data[i] = gray;
-                data[i + 1] = gray;
-                data[i + 2] = gray;
-            }
-            ctx.putImageData(imageData, 0, 0);
-
-            // Convert canvas back to blob/url for Tesseract
-            const processedImage = canvas.toDataURL('image/png');
-
-            loadingOverlay.querySelector('div:nth-child(2)').textContent = '숫자 인식 중...';
-
-            // 2. Tesseract with Whitelist
-            const worker = await Tesseract.createWorker('eng');
-
-            // Set parameters to only recognize numbers and decimals
-            await worker.setParameters({
-                tessedit_char_whitelist: '0123456789.,'
+        cropImage.onload = () => {
+            cropper = new Cropper(cropImage, {
+                aspectRatio: NaN,
+                viewMode: 1,
+                autoCropArea: 0.8,
+                dragMode: 'move',
+                background: false
             });
+        };
 
-            const ret = await worker.recognize(processedImage);
-            console.log('Raw OCR Text:', ret.data.text);
+        const cleanupCrop = () => {
+            if (cropper) {
+                cropper.destroy();
+            }
+            cropModal.remove();
+            URL.revokeObjectURL(imageUrl);
+            ocrInput.value = '';
+        };
 
-            // 3. Post-processing
-            // Replace comma with dot
-            const text = ret.data.text.replace(/,/g, '.');
+        cropModal.querySelector('#cropCancel').onclick = cleanupCrop;
 
-            // Extract numbers matching pattern (start or after space/newline, digits+dot+digits)
-            // Filter out noise like independent dots or tiny fragments
-            const matches = text.match(/[\d]+(\.[\d]+)?/g);
+        cropModal.querySelector('#cropConfirm').onclick = async () => {
+            if (!cropper) return;
 
-            if (matches && matches.length > 0) {
-                // Sort by length descending, assuming the meter reading is the longest number segment
-                // Also can filter by reasonable value range if known, but for now length is a good heuristic
-                const validNums = matches.filter(n => n.length >= 1 && n !== '.').sort((a, b) => b.length - a.length);
+            // Show Loading
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.querySelector('div:nth-child(2)').textContent = '이미지 전처리 중...';
 
-                if (validNums.length > 0) {
-                    const bestMatch = validNums[0];
+            // Get Cropped Canvas (Limit size to ensure fast processing)
+            const canvas = cropper.getCroppedCanvas({ maxWidth: 800 });
+            
+            // Close crop UI immediately so user sees loading state
+            cleanupCrop();
 
-                    if (currentTargetInputId) {
-                        const input = modal.querySelector(`#${currentTargetInputId}`);
-                        if (input) {
-                            input.value = bestMatch;
-                            // Visual Feedback
-                            input.style.backgroundColor = '#e8f5e9';
-                            setTimeout(() => input.style.backgroundColor = '#fff', 500);
+            try {
+                const ctx = canvas.getContext('2d');
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+
+                // Smart Preprocessing: Grayscale & Dynamic Binarization & Auto-Inversion
+                let totalGray = 0;
+                const pixelCount = data.length / 4;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                    totalGray += gray;
+                }
+                const avgGray = totalGray / pixelCount;
+
+                // Analyze border pixels to check if background is dark
+                let borderGraySum = 0;
+                let borderPixelCount = 0;
+                const w = canvas.width;
+                const h = canvas.height;
+
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
+                            const idx = (y * w + x) * 4;
+                            const r = data[idx];
+                            const g = data[idx + 1];
+                            const b = data[idx + 2];
+                            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                            borderGraySum += gray;
+                            borderPixelCount++;
                         }
                     }
-                } else {
-                    alert('유효한 숫자를 찾지 못했습니다.');
                 }
-            } else {
-                alert('숫자를 인식하지 못했습니다.');
+                const avgBorderGray = borderGraySum / borderPixelCount;
+                // If border is dark, it's a dark background (white-on-black or white-on-red dials)
+                const isDarkBackground = avgBorderGray < 120;
+
+                // Binarization & Auto-Inversion
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+
+                    let finalVal;
+                    if (isDarkBackground) {
+                        // Dark background: light text -> black (0), dark background -> white (255)
+                        finalVal = (gray > avgGray) ? 0 : 255;
+                    } else {
+                        // Light background: dark text -> black (0), light background -> white (255)
+                        finalVal = (gray < avgGray) ? 0 : 255;
+                    }
+
+                    data[i] = finalVal;
+                    data[i + 1] = finalVal;
+                    data[i + 2] = finalVal;
+                }
+                ctx.putImageData(imageData, 0, 0);
+
+                const processedImage = canvas.toDataURL('image/png');
+
+                loadingOverlay.querySelector('div:nth-child(2)').textContent = '숫자 인식 중...';
+
+                // Tesseract with Whitelist & PSM 7 (Single text line)
+                const worker = await Tesseract.createWorker('eng');
+                await worker.setParameters({
+                    tessedit_char_whitelist: '0123456789.,',
+                    tessedit_pageseg_mode: '7' // Single text line
+                });
+
+                const ret = await worker.recognize(processedImage);
+                console.log('Raw OCR Text (Cropped):', ret.data.text);
+
+                // Post-processing
+                const text = ret.data.text.replace(/,/g, '.').trim();
+                const matches = text.match(/[\d]+(\.[\d]+)?/g);
+
+                if (matches && matches.length > 0) {
+                    const validNums = matches.filter(n => n.length >= 1 && n !== '.').sort((a, b) => b.length - a.length);
+
+                    if (validNums.length > 0) {
+                        const bestMatch = validNums[0];
+
+                        if (currentTargetInputId) {
+                            const input = modal.querySelector(`#${currentTargetInputId}`);
+                            if (input) {
+                                input.value = bestMatch;
+                                input.style.backgroundColor = '#e8f5e9';
+                                setTimeout(() => input.style.backgroundColor = '#fff', 500);
+                            }
+                        }
+                    } else {
+                        alert('유효한 숫자를 찾지 못했습니다.');
+                    }
+                } else {
+                    alert('숫자를 인식하지 못했습니다.');
+                }
+
+                await worker.terminate();
+
+            } catch (err) {
+                console.error(err);
+                alert('OCR 처리 중 오류가 발생했습니다: ' + err.message);
+            } finally {
+                loadingOverlay.style.display = 'none';
             }
-
-            await worker.terminate();
-
-        } catch (err) {
-            console.error(err);
-            alert('OCR 처리 중 오류가 발생했습니다: ' + err.message);
-        } finally {
-            loadingOverlay.style.display = 'none';
-            ocrInput.value = ''; // Reset
-        }
+        };
     });
 
     // Form Handlers
