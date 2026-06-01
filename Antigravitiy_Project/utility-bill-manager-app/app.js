@@ -757,9 +757,9 @@ function openEditModal(index) {
                 <div style="font-size:12px; margin-top:10px; opacity:0.8;">잠시만 기다려주세요</div>
             `;
 
-            // Get Cropped Canvas
-            const canvasNormal = cropper.getCroppedCanvas();
-            if (!canvasNormal) {
+            // Get Cropped Canvas — force minimum 600×80px output from Cropper
+            const canvasRaw = cropper.getCroppedCanvas({ minWidth: 600, minHeight: 80, maxWidth: 3000 });
+            if (!canvasRaw) {
                 cleanupCrop();
                 alert('이미지 크롭에 실패했습니다.');
                 return;
@@ -769,31 +769,43 @@ function openEditModal(index) {
             cleanupCrop();
 
             try {
-                const rawW = canvasNormal.width;
-                const rawH = canvasNormal.height;
+                let srcCanvas = canvasRaw;
+
+                // Auto-rotate portrait crops to landscape
+                // (happens when user accidentally drags crop box vertically)
+                if (canvasRaw.height > canvasRaw.width) {
+                    srcCanvas = document.createElement('canvas');
+                    srcCanvas.width = canvasRaw.height;
+                    srcCanvas.height = canvasRaw.width;
+                    const ctxRot = srcCanvas.getContext('2d');
+                    ctxRot.translate(srcCanvas.width / 2, srcCanvas.height / 2);
+                    ctxRot.rotate(Math.PI / 2);
+                    ctxRot.drawImage(canvasRaw, -canvasRaw.width / 2, -canvasRaw.height / 2);
+                }
+
+                const rawW = srcCanvas.width;
+                const rawH = srcCanvas.height;
 
                 // Show raw crop dimensions in debug label
                 const sizeLabel = loadingOverlay.querySelector('#ocrDebugSizeLabel');
-                if (sizeLabel) sizeLabel.textContent = `크롭 원본 크기: ${rawW} × ${rawH}px`;
+                if (sizeLabel) sizeLabel.textContent = `크롭 크기: ${rawW} × ${rawH}px${canvasRaw.height > canvasRaw.width ? ' (자동 회전)' : ''}`;
 
-                // Enforce minimum size — Tesseract needs at least ~200px wide
-                const MIN_W = 300;
-                const MIN_H = 60;
-                const scaleX = rawW < MIN_W ? MIN_W / rawW : 1;
-                const scaleY = rawH < MIN_H ? MIN_H / rawH : 1;
-                const SCALE = Math.max(scaleX, scaleY, 3); // At least 3x upscale
-
+                // Scale up to TARGET_W (at least 900px wide) for Tesseract
+                const TARGET_W = 900;
+                const SCALE = Math.max(TARGET_W / rawW, 1);
                 const W = Math.round(rawW * SCALE);
                 const H = Math.round(rawH * SCALE);
+
+                // Upscaled color canvas
                 const canvasUpscaled = document.createElement('canvas');
                 canvasUpscaled.width = W;
                 canvasUpscaled.height = H;
                 const ctxUp = canvasUpscaled.getContext('2d');
                 ctxUp.imageSmoothingEnabled = true;
                 ctxUp.imageSmoothingQuality = 'high';
-                ctxUp.drawImage(canvasNormal, 0, 0, W, H);
+                ctxUp.drawImage(srcCanvas, 0, 0, W, H);
 
-                // Grayscale version of upscaled canvas (helps Tesseract on colored backgrounds)
+                // Grayscale version
                 const canvasGray = document.createElement('canvas');
                 canvasGray.width = W;
                 canvasGray.height = H;
