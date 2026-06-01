@@ -693,10 +693,12 @@ function openEditModal(index) {
             cropper = new Cropper(cropImage, {
                 aspectRatio: NaN, // Free-form crop after rotation
                 viewMode: 1,
-                autoCropArea: 0.4, // Small initial box — user will resize to digits only
+                autoCropArea: 0.4,
                 dragMode: 'move',
                 background: false,
-                rotatable: true
+                rotatable: true,
+                minCropBoxWidth: 120,  // Prevent crops that are too narrow
+                minCropBoxHeight: 30   // Prevent crops that are too short
             });
         };
 
@@ -747,45 +749,54 @@ function openEditModal(index) {
                 <div class="spinner"></div>
                 <div>이미지 전처리 중...</div>
                 <div style="margin-top:15px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px;">
-                    <div style="font-size:11px; opacity:0.7;">인식기 전달 이미지 (상단: 일반 / 하단: 반전)</div>
-                    <img id="ocrDebugImgNormal" style="max-width:200px; max-height:80px; border:1px solid #555; background:#fff; border-radius:4px;">
-                    <img id="ocrDebugImgInverted" style="max-width:200px; max-height:80px; border:1px solid #555; background:#fff; border-radius:4px;">
+                    <div id="ocrDebugSizeLabel" style="font-size:12px; color:#ffb300;">크롭 크기 계산 중...</div>
+                    <div style="font-size:11px; opacity:0.7;">Tesseract 전달 이미지 (위: 컬러 / 아래: 흑백)</div>
+                    <img id="ocrDebugImgNormal" style="max-width:240px; max-height:80px; border:1px solid #555; background:#fff; border-radius:4px;">
+                    <img id="ocrDebugImgInverted" style="max-width:240px; max-height:80px; border:1px solid #555; background:#fff; border-radius:4px;">
                 </div>
-                <div style="font-size:12px; margin-top:15px; opacity:0.8;">잠시만 기다려주세요</div>
+                <div style="font-size:12px; margin-top:10px; opacity:0.8;">잠시만 기다려주세요</div>
             `;
 
-            // Get Cropped Canvas (Limit size to ensure fast processing)
-            const canvasNormal = cropper.getCroppedCanvas({ maxWidth: 800 });
+            // Get Cropped Canvas
+            const canvasNormal = cropper.getCroppedCanvas();
             if (!canvasNormal) {
                 cleanupCrop();
                 alert('이미지 크롭에 실패했습니다.');
                 return;
             }
 
-            // Close crop UI immediately so user sees loading state
+            // Close crop UI immediately
             cleanupCrop();
 
             try {
-                // --- Strategy: Skip manual binarization, let Tesseract handle it internally ---
-                // Manual binarization was destroying the grayscale gradient that Tesseract needs.
-                // Instead: upscale the raw crop and send both original color + grayscale to Tesseract.
+                const rawW = canvasNormal.width;
+                const rawH = canvasNormal.height;
 
-                const W = canvasNormal.width;
-                const H = canvasNormal.height;
+                // Show raw crop dimensions in debug label
+                const sizeLabel = loadingOverlay.querySelector('#ocrDebugSizeLabel');
+                if (sizeLabel) sizeLabel.textContent = `크롭 원본 크기: ${rawW} × ${rawH}px`;
 
-                // Upscale 3x for better digit pixel density
-                const SCALE = 3;
+                // Enforce minimum size — Tesseract needs at least ~200px wide
+                const MIN_W = 300;
+                const MIN_H = 60;
+                const scaleX = rawW < MIN_W ? MIN_W / rawW : 1;
+                const scaleY = rawH < MIN_H ? MIN_H / rawH : 1;
+                const SCALE = Math.max(scaleX, scaleY, 3); // At least 3x upscale
+
+                const W = Math.round(rawW * SCALE);
+                const H = Math.round(rawH * SCALE);
                 const canvasUpscaled = document.createElement('canvas');
-                canvasUpscaled.width = W * SCALE;
-                canvasUpscaled.height = H * SCALE;
+                canvasUpscaled.width = W;
+                canvasUpscaled.height = H;
                 const ctxUp = canvasUpscaled.getContext('2d');
-                ctxUp.imageSmoothingEnabled = false;
-                ctxUp.drawImage(canvasNormal, 0, 0, W * SCALE, H * SCALE);
+                ctxUp.imageSmoothingEnabled = true;
+                ctxUp.imageSmoothingQuality = 'high';
+                ctxUp.drawImage(canvasNormal, 0, 0, W, H);
 
                 // Grayscale version of upscaled canvas (helps Tesseract on colored backgrounds)
                 const canvasGray = document.createElement('canvas');
-                canvasGray.width = W * SCALE;
-                canvasGray.height = H * SCALE;
+                canvasGray.width = W;
+                canvasGray.height = H;
                 const ctxGray = canvasGray.getContext('2d');
                 ctxGray.drawImage(canvasUpscaled, 0, 0);
                 const imgDataGray = ctxGray.getImageData(0, 0, canvasGray.width, canvasGray.height);
