@@ -816,14 +816,10 @@ function openEditModal(index) {
                 ];
 
                 const extractNumber = (rawText) => {
-                    const text = rawText.replace(/,/g, '.').trim();
-                    const matches = text.match(/[\d]+(\.[\d]+)?/g);
-                    if (matches && matches.length > 0) {
-                        return matches
-                            .filter(n => n.length >= 1 && n !== '.')
-                            .sort((a, b) => b.length - a.length)[0] || '';
-                    }
-                    return '';
+                    // Strip ALL non-digit characters and concatenate.
+                    // Handles split-slot meters: "0.0.92.0" or "0 0 9 2 0" -> "00920"
+                    const digitsOnly = rawText.replace(/[^0-9]/g, '');
+                    return digitsOnly;
                 };
 
                 let bestMatch = '';
@@ -831,7 +827,8 @@ function openEditModal(index) {
 
                 for (const attempt of attempts) {
                     await worker.setParameters({
-                        tessedit_char_whitelist: '0123456789.',
+                        // Digits only - no dot, so Tesseract won't insert fake decimal points between slots
+                        tessedit_char_whitelist: '0123456789',
                         tessedit_pageseg_mode: attempt.psm
                     });
                     const res = await worker.recognize(attempt.img);
