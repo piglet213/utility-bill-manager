@@ -819,23 +819,43 @@ function openEditModal(index) {
                 }
                 ctxGray.putImageData(imgDataGray, 0, 0);
 
+                // Build INVERTED grayscale (white digits on dark → black digits on white for Tesseract)
+                const canvasInverted = document.createElement('canvas');
+                canvasInverted.width = W;
+                canvasInverted.height = H;
+                const ctxInv = canvasInverted.getContext('2d');
+                ctxInv.drawImage(canvasGray, 0, 0);
+                const imgDataInv = ctxInv.getImageData(0, 0, W, H);
+                const dinv = imgDataInv.data;
+                for (let i = 0; i < dinv.length; i += 4) {
+                    dinv[i]   = 255 - dinv[i];
+                    dinv[i+1] = 255 - dinv[i+1];
+                    dinv[i+2] = 255 - dinv[i+2];
+                }
+                ctxInv.putImageData(imgDataInv, 0, 0);
+                const imgInverted = canvasInverted.toDataURL('image/png');
+
                 const imgUpscaled = canvasUpscaled.toDataURL('image/png');
                 const imgGrayscale = canvasGray.toDataURL('image/png');
 
-                // Show debug preview: upscaled color (top) + grayscale (bottom)
+                // Show debug preview: color (top) + inverted grayscale (bottom)
                 loadingOverlay.querySelector('#ocrDebugImgNormal').src = imgUpscaled;
-                loadingOverlay.querySelector('#ocrDebugImgInverted').src = imgGrayscale;
+                loadingOverlay.querySelector('#ocrDebugImgInverted').src = imgInverted;
 
                 loadingOverlay.querySelector('div:nth-child(2)').textContent = '숫자 인식 중...';
 
                 const worker = await Tesseract.createWorker('eng');
 
-                // Run 4 attempts: upscaled color PSM6, upscaled color PSM7, grayscale PSM6, grayscale PSM7
+                // 6 attempts: PSM7 + PSM13 (raw line), with inverted / grayscale / color
+                // PSM13 bypasses Tesseract's internal line-finding heuristics (better for low-res crops)
+                // Inverted = white-on-dark meter → black-on-white (Tesseract's expected format)
                 const attempts = [
-                    { img: imgUpscaled,   psm: '7' },
-                    { img: imgGrayscale,  psm: '7' },
-                    { img: imgUpscaled,   psm: '6' },
-                    { img: imgGrayscale,  psm: '6' },
+                    { img: imgInverted,  psm: '7',  label: 'inv+PSM7'   },
+                    { img: imgInverted,  psm: '13', label: 'inv+PSM13'  },
+                    { img: imgGrayscale, psm: '7',  label: 'gray+PSM7'  },
+                    { img: imgGrayscale, psm: '13', label: 'gray+PSM13' },
+                    { img: imgUpscaled,  psm: '7',  label: 'color+PSM7' },
+                    { img: imgUpscaled,  psm: '13', label: 'color+PSM13'},
                 ];
 
                 const extractNumber = (rawText) => {
@@ -856,7 +876,7 @@ function openEditModal(index) {
                     });
                     const res = await worker.recognize(attempt.img);
                     const num = extractNumber(res.data.text);
-                    console.log(`PSM ${attempt.psm} raw: "${res.data.text}" → extracted: "${num}" conf: ${res.data.confidence}`);
+                    console.log(`[${attempt.label}] raw: "${res.data.text.trim()}" → "${num}" conf:${res.data.confidence}`);
 
                     if (num.length > bestMatch.length) {
                         bestMatch = num;
