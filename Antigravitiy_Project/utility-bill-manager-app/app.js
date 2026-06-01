@@ -660,7 +660,7 @@ function openEditModal(index) {
             <div class="crop-header">
                 <h3>계량기 숫자 크롭</h3>
                 <p style="color: #ffb300; font-weight: bold; margin-top: 5px; font-size: 13px; line-height: 1.4; padding: 0 10px;">
-                    ⚠️ 중요: 주변 글씨(제조사, 시리얼번호 등)를 제외하고, 오직 '숫자 부분(계기판)'만 최대한 좁고 길게 드래그해서 선택해 주세요!
+                    ⚠️ 가이드: 상자의 크기를 조절하여, 오직 **숫자가 적힌 계기판 영역만 아주 좁게** 상자 안에 가득 차도록 맞춰주세요! (주변 흰색 테두리가 들어가면 인식이 실패합니다)
                 </p>
             </div>
             <div class="crop-container">
@@ -677,9 +677,9 @@ function openEditModal(index) {
 
         cropImage.onload = () => {
             cropper = new Cropper(cropImage, {
-                aspectRatio: NaN,
+                aspectRatio: 5, // 5:1 ratio to enforce horizontal digit-only box
                 viewMode: 1,
-                autoCropArea: 0.8,
+                autoCropArea: 0.5, // Start with a smaller initial box
                 dragMode: 'move',
                 background: false
             });
