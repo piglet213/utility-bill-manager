@@ -659,9 +659,18 @@ function openEditModal(index) {
         cropModal.innerHTML = `
             <div class="crop-header">
                 <h3>계량기 숫자 크롭</h3>
-                <p style="color: #ffb300; font-weight: bold; margin-top: 5px; font-size: 13px; line-height: 1.4; padding: 0 10px;">
-                    ⚠️ 가이드: 상자의 크기를 조절하여, 오직 **숫자가 적힌 계기판 영역만 아주 좁게** 상자 안에 가득 차도록 맞춰주세요! (주변 흰색 테두리가 들어가면 인식이 실패합니다)
+                <p style="color: #ffb300; font-weight: bold; margin-top: 5px; font-size: 12px; line-height: 1.4; padding: 0 8px;">
+                    ① 먼저 아래 버튼으로 이미지를 회전하여 숫자판을 가로로 맞추세요<br>
+                    ② 그 다음 크롭 상자를 숫자 영역에만 딱 맞게 조절하세요
                 </p>
+                <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px; flex-wrap: wrap;">
+                    <button type="button" id="rotateLeft5" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:7px 12px; border-radius:8px; font-size:20px; cursor:pointer;" title="5° 반시계 회전">↺</button>
+                    <button type="button" id="rotateLeft1" style="background:rgba(255,255,255,0.15); border:none; color:white; padding:7px 10px; border-radius:8px; font-size:13px; cursor:pointer;" title="1° 반시계 회전">-1°</button>
+                    <span id="rotateAngleLabel" style="color:white; font-size:13px; min-width:40px; text-align:center;">0°</span>
+                    <button type="button" id="rotateRight1" style="background:rgba(255,255,255,0.15); border:none; color:white; padding:7px 10px; border-radius:8px; font-size:13px; cursor:pointer;" title="1° 시계 회전">+1°</button>
+                    <button type="button" id="rotateRight5" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:7px 12px; border-radius:8px; font-size:20px; cursor:pointer;" title="5° 시계 회전">↻</button>
+                    <button type="button" id="rotateReset" style="background:rgba(255,100,100,0.4); border:none; color:white; padding:7px 10px; border-radius:8px; font-size:12px; cursor:pointer;">초기화</button>
+                </div>
             </div>
             <div class="crop-container">
                 <img id="cropImage" src="${imageUrl}">
@@ -674,16 +683,49 @@ function openEditModal(index) {
 
         const cropImage = cropModal.querySelector('#cropImage');
         let cropper;
+        let currentAngle = 0;
+
+        const updateAngleLabel = () => {
+            cropModal.querySelector('#rotateAngleLabel').textContent = `${currentAngle}°`;
+        };
 
         cropImage.onload = () => {
             cropper = new Cropper(cropImage, {
-                aspectRatio: 5, // 5:1 ratio to enforce horizontal digit-only box
+                aspectRatio: NaN, // Free-form crop after rotation
                 viewMode: 1,
-                autoCropArea: 0.5, // Start with a smaller initial box
+                autoCropArea: 0.4, // Small initial box — user will resize to digits only
                 dragMode: 'move',
-                background: false
+                background: false,
+                rotatable: true
             });
         };
+
+        // Rotation button event listeners
+        cropModal.querySelector('#rotateLeft5').addEventListener('click', () => {
+            currentAngle -= 5;
+            cropper && cropper.rotateTo(currentAngle);
+            updateAngleLabel();
+        });
+        cropModal.querySelector('#rotateLeft1').addEventListener('click', () => {
+            currentAngle -= 1;
+            cropper && cropper.rotateTo(currentAngle);
+            updateAngleLabel();
+        });
+        cropModal.querySelector('#rotateRight1').addEventListener('click', () => {
+            currentAngle += 1;
+            cropper && cropper.rotateTo(currentAngle);
+            updateAngleLabel();
+        });
+        cropModal.querySelector('#rotateRight5').addEventListener('click', () => {
+            currentAngle += 5;
+            cropper && cropper.rotateTo(currentAngle);
+            updateAngleLabel();
+        });
+        cropModal.querySelector('#rotateReset').addEventListener('click', () => {
+            currentAngle = 0;
+            cropper && cropper.rotateTo(0);
+            updateAngleLabel();
+        });
 
         const cleanupCrop = () => {
             if (cropper) {
