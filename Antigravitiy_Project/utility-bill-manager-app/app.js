@@ -659,7 +659,9 @@ function openEditModal(index) {
         cropModal.innerHTML = `
             <div class="crop-header">
                 <h3>계량기 숫자 크롭</h3>
-                <p>숫자가 있는 지시부 영역만 마우스나 터치로 지정해 주세요</p>
+                <p style="color: #ffb300; font-weight: bold; margin-top: 5px; font-size: 13px; line-height: 1.4; padding: 0 10px;">
+                    ⚠️ 중요: 주변 글씨(제조사, 시리얼번호 등)를 제외하고, 오직 '숫자 부분(계기판)'만 최대한 좁고 길게 드래그해서 선택해 주세요!
+                </p>
             </div>
             <div class="crop-container">
                 <img id="cropImage" src="${imageUrl}">
@@ -697,116 +699,146 @@ function openEditModal(index) {
         cropModal.querySelector('#cropConfirm').onclick = async () => {
             if (!cropper) return;
 
-            // Show Loading
+            // Show Loading with debug image containers
             loadingOverlay.style.display = 'flex';
-            loadingOverlay.querySelector('div:nth-child(2)').textContent = '이미지 전처리 중...';
+            loadingOverlay.innerHTML = `
+                <div class="spinner"></div>
+                <div>이미지 전처리 중...</div>
+                <div style="margin-top:15px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px;">
+                    <div style="font-size:11px; opacity:0.7;">인식기 전달 이미지 (상단: 일반 / 하단: 반전)</div>
+                    <img id="ocrDebugImgNormal" style="max-width:200px; max-height:80px; border:1px solid #555; background:#fff; border-radius:4px;">
+                    <img id="ocrDebugImgInverted" style="max-width:200px; max-height:80px; border:1px solid #555; background:#fff; border-radius:4px;">
+                </div>
+                <div style="font-size:12px; margin-top:15px; opacity:0.8;">잠시만 기다려주세요</div>
+            `;
 
             // Get Cropped Canvas (Limit size to ensure fast processing)
-            const canvas = cropper.getCroppedCanvas({ maxWidth: 800 });
+            const canvasNormal = cropper.getCroppedCanvas({ maxWidth: 800 });
+            if (!canvasNormal) {
+                cleanupCrop();
+                alert('이미지 크롭에 실패했습니다.');
+                return;
+            }
+
+            // Create inverted canvas
+            const canvasInverted = document.createElement('canvas');
+            canvasInverted.width = canvasNormal.width;
+            canvasInverted.height = canvasNormal.height;
+            const ctxInverted = canvasInverted.getContext('2d');
             
             // Close crop UI immediately so user sees loading state
             cleanupCrop();
 
             try {
-                const ctx = canvas.getContext('2d');
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageData.data;
+                const ctxNormal = canvasNormal.getContext('2d');
+                const imageDataNormal = ctxNormal.getImageData(0, 0, canvasNormal.width, canvasNormal.height);
+                const dataNormal = imageDataNormal.data;
 
-                // Smart Preprocessing: Grayscale & Dynamic Binarization & Auto-Inversion
+                const imageDataInverted = ctxInverted.createImageData(canvasNormal.width, canvasNormal.height);
+                const dataInverted = imageDataInverted.data;
+
+                // 1. Calculate average grayscale value
                 let totalGray = 0;
-                const pixelCount = data.length / 4;
+                const pixelCount = dataNormal.length / 4;
 
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
+                for (let i = 0; i < dataNormal.length; i += 4) {
+                    const r = dataNormal[i];
+                    const g = dataNormal[i + 1];
+                    const b = dataNormal[i + 2];
                     const gray = 0.299 * r + 0.587 * g + 0.114 * b;
                     totalGray += gray;
                 }
                 const avgGray = totalGray / pixelCount;
 
-                // Analyze border pixels to check if background is dark
-                let borderGraySum = 0;
-                let borderPixelCount = 0;
-                const w = canvas.width;
-                const h = canvas.height;
-
-                for (let y = 0; y < h; y++) {
-                    for (let x = 0; x < w; x++) {
-                        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
-                            const idx = (y * w + x) * 4;
-                            const r = data[idx];
-                            const g = data[idx + 1];
-                            const b = data[idx + 2];
-                            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-                            borderGraySum += gray;
-                            borderPixelCount++;
-                        }
-                    }
-                }
-                const avgBorderGray = borderGraySum / borderPixelCount;
-                // If border is dark, it's a dark background (white-on-black or white-on-red dials)
-                const isDarkBackground = avgBorderGray < 120;
-
-                // Binarization & Auto-Inversion
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
+                // 2. Binarize and invert in a single pass
+                for (let i = 0; i < dataNormal.length; i += 4) {
+                    const r = dataNormal[i];
+                    const g = dataNormal[i + 1];
+                    const b = dataNormal[i + 2];
                     const gray = 0.299 * r + 0.587 * g + 0.114 * b;
 
-                    let finalVal;
-                    if (isDarkBackground) {
-                        // Dark background: light text -> black (0), dark background -> white (255)
-                        finalVal = (gray > avgGray) ? 0 : 255;
-                    } else {
-                        // Light background: dark text -> black (0), light background -> white (255)
-                        finalVal = (gray < avgGray) ? 0 : 255;
-                    }
+                    // Normal binarization
+                    const valNormal = (gray < avgGray) ? 0 : 255;
+                    dataNormal[i] = valNormal;
+                    dataNormal[i + 1] = valNormal;
+                    dataNormal[i + 2] = valNormal;
 
-                    data[i] = finalVal;
-                    data[i + 1] = finalVal;
-                    data[i + 2] = finalVal;
+                    // Inverted binarization
+                    const valInverted = 255 - valNormal;
+                    dataInverted[i] = valInverted;
+                    dataInverted[i + 1] = valInverted;
+                    dataInverted[i + 2] = valInverted;
+                    dataInverted[i + 3] = 255; // Alpha
                 }
-                ctx.putImageData(imageData, 0, 0);
+                ctxNormal.putImageData(imageDataNormal, 0, 0);
+                ctxInverted.putImageData(imageDataInverted, 0, 0);
 
-                const processedImage = canvas.toDataURL('image/png');
+                const processedNormal = canvasNormal.toDataURL('image/png');
+                const processedInverted = canvasInverted.toDataURL('image/png');
+
+                // Update debug images in loading UI
+                loadingOverlay.querySelector('#ocrDebugImgNormal').src = processedNormal;
+                loadingOverlay.querySelector('#ocrDebugImgInverted').src = processedInverted;
 
                 loadingOverlay.querySelector('div:nth-child(2)').textContent = '숫자 인식 중...';
 
-                // Tesseract with Whitelist & PSM 7 (Single text line)
+                // Tesseract with Whitelist
                 const worker = await Tesseract.createWorker('eng');
                 await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789.,',
-                    tessedit_pageseg_mode: '7' // Single text line
+                    tessedit_char_whitelist: '0123456789.,'
+                    // Omitted tessedit_pageseg_mode to allow automatic layout analysis for wider crops
                 });
 
-                const ret = await worker.recognize(processedImage);
-                console.log('Raw OCR Text (Cropped):', ret.data.text);
+                // Run OCR on both Normal and Inverted binarizations
+                const resNormal = await worker.recognize(processedNormal);
+                const resInverted = await worker.recognize(processedInverted);
 
-                // Post-processing
-                const text = ret.data.text.replace(/,/g, '.').trim();
-                const matches = text.match(/[\d]+(\.[\d]+)?/g);
+                console.log('Normal OCR Text:', resNormal.data.text, 'Confidence:', resNormal.data.confidence);
+                console.log('Inverted OCR Text:', resInverted.data.text, 'Confidence:', resInverted.data.confidence);
 
-                if (matches && matches.length > 0) {
-                    const validNums = matches.filter(n => n.length >= 1 && n !== '.').sort((a, b) => b.length - a.length);
+                const extractNumber = (rawText) => {
+                    const text = rawText.replace(/,/g, '.').trim();
+                    const matches = text.match(/[\d]+(\.[\d]+)?/g);
+                    if (matches && matches.length > 0) {
+                        return matches.filter(n => n.length >= 1 && n !== '.').sort((a, b) => b.length - a.length)[0] || '';
+                    }
+                    return '';
+                };
 
-                    if (validNums.length > 0) {
-                        const bestMatch = validNums[0];
+                const numNormal = extractNumber(resNormal.data.text);
+                const numInverted = extractNumber(resInverted.data.text);
 
-                        if (currentTargetInputId) {
-                            const input = modal.querySelector(`#${currentTargetInputId}`);
-                            if (input) {
-                                input.value = bestMatch;
-                                input.style.backgroundColor = '#e8f5e9';
-                                setTimeout(() => input.style.backgroundColor = '#fff', 500);
-                            }
-                        }
+                console.log('Extracted Normal:', numNormal);
+                console.log('Extracted Inverted:', numInverted);
+
+                // Choose best result
+                let bestMatch = '';
+                const lenNormal = numNormal.length;
+                const lenInverted = numInverted.length;
+
+                if (lenNormal > 0 && lenInverted > 0) {
+                    // Prioritize longer number sequence (e.g. reading vs short noise)
+                    if (Math.abs(lenNormal - lenInverted) >= 2) {
+                        bestMatch = (lenNormal > lenInverted) ? numNormal : numInverted;
                     } else {
-                        alert('유효한 숫자를 찾지 못했습니다.');
+                        // Choose higher confidence if lengths are similar
+                        bestMatch = (resNormal.data.confidence >= resInverted.data.confidence) ? numNormal : numInverted;
                     }
                 } else {
-                    alert('숫자를 인식하지 못했습니다.');
+                    bestMatch = numNormal || numInverted;
+                }
+
+                if (bestMatch) {
+                    if (currentTargetInputId) {
+                        const input = modal.querySelector(`#${currentTargetInputId}`);
+                        if (input) {
+                            input.value = bestMatch;
+                            input.style.backgroundColor = '#e8f5e9';
+                            setTimeout(() => input.style.backgroundColor = '#fff', 500);
+                        }
+                    }
+                } else {
+                    alert('숫자를 인식하지 못했습니다. 더 좁고 정확하게 숫자 영역만 크롭해 주세요.');
                 }
 
                 await worker.terminate();
@@ -815,6 +847,12 @@ function openEditModal(index) {
                 console.error(err);
                 alert('OCR 처리 중 오류가 발생했습니다: ' + err.message);
             } finally {
+                // Restore loadingOverlay template for subsequent executions
+                loadingOverlay.innerHTML = `
+                    <div class="spinner"></div>
+                    <div>숫자 인식 중...</div>
+                    <div style="font-size:12px; margin-top:10px; opacity:0.8;">잠시만 기다려주세요</div>
+                `;
                 loadingOverlay.style.display = 'none';
             }
         };
