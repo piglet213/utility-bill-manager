@@ -844,11 +844,14 @@ function openEditModal(index) {
 
                 loadingOverlay.querySelector('div:nth-child(2)').textContent = '숫자 인식 중...';
 
-                const worker = await Tesseract.createWorker('eng');
+                // OEM 0 = Legacy Tesseract engine (template matching)
+                // Much better than LSTM (OEM 1) for utility meter drum displays:
+                //   - Fixed-width, uniform digit font → legacy template matching excels
+                //   - LSTM is trained on varied natural text → confused by isolated meter digits
+                const worker = await Tesseract.createWorker('eng', 0);
 
-                // Attempts: PSM13 (raw line, no line-finding) + PSM8 (single word)
-                // PSM7 removed — it triggers internal Tesseract segmentation errors on meter images
-                // user_defined_dpi:300 prevents "Image too small to scale" from Tesseract 72dpi assumption
+                // 6 attempts with Legacy engine: PSM13 (raw line) + PSM10 (single char)
+                // and all three image types
                 const attempts = [
                     { img: imgInverted,  psm: '13', label: 'inv+PSM13'  },
                     { img: imgInverted,  psm: '8',  label: 'inv+PSM8'   },
@@ -861,8 +864,7 @@ function openEditModal(index) {
                 const extractNumber = (rawText) => {
                     // Strip ALL non-digit characters and concatenate.
                     // Handles split-slot meters: "0.0.92.0" or "0 0 9 2 0" -> "00920"
-                    const digitsOnly = rawText.replace(/[^0-9]/g, '');
-                    return digitsOnly;
+                    return rawText.replace(/[^0-9]/g, '');
                 };
 
                 let bestMatch = '';
@@ -888,6 +890,7 @@ function openEditModal(index) {
                 }
 
                 await worker.terminate();
+
 
                 if (bestMatch) {
                     if (currentTargetInputId) {
