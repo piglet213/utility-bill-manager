@@ -762,113 +762,92 @@ function openEditModal(index) {
                 return;
             }
 
-            // Create inverted canvas
-            const canvasInverted = document.createElement('canvas');
-            canvasInverted.width = canvasNormal.width;
-            canvasInverted.height = canvasNormal.height;
-            const ctxInverted = canvasInverted.getContext('2d');
-            
             // Close crop UI immediately so user sees loading state
             cleanupCrop();
 
             try {
-                const ctxNormal = canvasNormal.getContext('2d');
-                const imageDataNormal = ctxNormal.getImageData(0, 0, canvasNormal.width, canvasNormal.height);
-                const dataNormal = imageDataNormal.data;
+                // --- Strategy: Skip manual binarization, let Tesseract handle it internally ---
+                // Manual binarization was destroying the grayscale gradient that Tesseract needs.
+                // Instead: upscale the raw crop and send both original color + grayscale to Tesseract.
 
-                const imageDataInverted = ctxInverted.createImageData(canvasNormal.width, canvasNormal.height);
-                const dataInverted = imageDataInverted.data;
+                const W = canvasNormal.width;
+                const H = canvasNormal.height;
 
-                // 1. Calculate average grayscale value
-                let totalGray = 0;
-                const pixelCount = dataNormal.length / 4;
+                // Upscale 3x for better digit pixel density
+                const SCALE = 3;
+                const canvasUpscaled = document.createElement('canvas');
+                canvasUpscaled.width = W * SCALE;
+                canvasUpscaled.height = H * SCALE;
+                const ctxUp = canvasUpscaled.getContext('2d');
+                ctxUp.imageSmoothingEnabled = false;
+                ctxUp.drawImage(canvasNormal, 0, 0, W * SCALE, H * SCALE);
 
-                for (let i = 0; i < dataNormal.length; i += 4) {
-                    const r = dataNormal[i];
-                    const g = dataNormal[i + 1];
-                    const b = dataNormal[i + 2];
-                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-                    totalGray += gray;
+                // Grayscale version of upscaled canvas (helps Tesseract on colored backgrounds)
+                const canvasGray = document.createElement('canvas');
+                canvasGray.width = W * SCALE;
+                canvasGray.height = H * SCALE;
+                const ctxGray = canvasGray.getContext('2d');
+                ctxGray.drawImage(canvasUpscaled, 0, 0);
+                const imgDataGray = ctxGray.getImageData(0, 0, canvasGray.width, canvasGray.height);
+                const dgray = imgDataGray.data;
+                for (let i = 0; i < dgray.length; i += 4) {
+                    const lum = 0.299 * dgray[i] + 0.587 * dgray[i+1] + 0.114 * dgray[i+2];
+                    dgray[i] = dgray[i+1] = dgray[i+2] = lum;
                 }
-                const avgGray = totalGray / pixelCount;
+                ctxGray.putImageData(imgDataGray, 0, 0);
 
-                // 2. Binarize and invert in a single pass
-                for (let i = 0; i < dataNormal.length; i += 4) {
-                    const r = dataNormal[i];
-                    const g = dataNormal[i + 1];
-                    const b = dataNormal[i + 2];
-                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                const imgUpscaled = canvasUpscaled.toDataURL('image/png');
+                const imgGrayscale = canvasGray.toDataURL('image/png');
 
-                    // Normal binarization
-                    const valNormal = (gray < avgGray) ? 0 : 255;
-                    dataNormal[i] = valNormal;
-                    dataNormal[i + 1] = valNormal;
-                    dataNormal[i + 2] = valNormal;
-
-                    // Inverted binarization
-                    const valInverted = 255 - valNormal;
-                    dataInverted[i] = valInverted;
-                    dataInverted[i + 1] = valInverted;
-                    dataInverted[i + 2] = valInverted;
-                    dataInverted[i + 3] = 255; // Alpha
-                }
-                ctxNormal.putImageData(imageDataNormal, 0, 0);
-                ctxInverted.putImageData(imageDataInverted, 0, 0);
-
-                const processedNormal = canvasNormal.toDataURL('image/png');
-                const processedInverted = canvasInverted.toDataURL('image/png');
-
-                // Update debug images in loading UI
-                loadingOverlay.querySelector('#ocrDebugImgNormal').src = processedNormal;
-                loadingOverlay.querySelector('#ocrDebugImgInverted').src = processedInverted;
+                // Show debug preview: upscaled color (top) + grayscale (bottom)
+                loadingOverlay.querySelector('#ocrDebugImgNormal').src = imgUpscaled;
+                loadingOverlay.querySelector('#ocrDebugImgInverted').src = imgGrayscale;
 
                 loadingOverlay.querySelector('div:nth-child(2)').textContent = '숫자 인식 중...';
 
-                // Tesseract with Whitelist
                 const worker = await Tesseract.createWorker('eng');
-                await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789.,'
-                    // Omitted tessedit_pageseg_mode to allow automatic layout analysis for wider crops
-                });
 
-                // Run OCR on both Normal and Inverted binarizations
-                const resNormal = await worker.recognize(processedNormal);
-                const resInverted = await worker.recognize(processedInverted);
-
-                console.log('Normal OCR Text:', resNormal.data.text, 'Confidence:', resNormal.data.confidence);
-                console.log('Inverted OCR Text:', resInverted.data.text, 'Confidence:', resInverted.data.confidence);
+                // Run 4 attempts: upscaled color PSM6, upscaled color PSM7, grayscale PSM6, grayscale PSM7
+                const attempts = [
+                    { img: imgUpscaled,   psm: '7' },
+                    { img: imgGrayscale,  psm: '7' },
+                    { img: imgUpscaled,   psm: '6' },
+                    { img: imgGrayscale,  psm: '6' },
+                ];
 
                 const extractNumber = (rawText) => {
                     const text = rawText.replace(/,/g, '.').trim();
                     const matches = text.match(/[\d]+(\.[\d]+)?/g);
                     if (matches && matches.length > 0) {
-                        return matches.filter(n => n.length >= 1 && n !== '.').sort((a, b) => b.length - a.length)[0] || '';
+                        return matches
+                            .filter(n => n.length >= 1 && n !== '.')
+                            .sort((a, b) => b.length - a.length)[0] || '';
                     }
                     return '';
                 };
 
-                const numNormal = extractNumber(resNormal.data.text);
-                const numInverted = extractNumber(resInverted.data.text);
-
-                console.log('Extracted Normal:', numNormal);
-                console.log('Extracted Inverted:', numInverted);
-
-                // Choose best result
                 let bestMatch = '';
-                const lenNormal = numNormal.length;
-                const lenInverted = numInverted.length;
+                let bestConfidence = -1;
 
-                if (lenNormal > 0 && lenInverted > 0) {
-                    // Prioritize longer number sequence (e.g. reading vs short noise)
-                    if (Math.abs(lenNormal - lenInverted) >= 2) {
-                        bestMatch = (lenNormal > lenInverted) ? numNormal : numInverted;
-                    } else {
-                        // Choose higher confidence if lengths are similar
-                        bestMatch = (resNormal.data.confidence >= resInverted.data.confidence) ? numNormal : numInverted;
+                for (const attempt of attempts) {
+                    await worker.setParameters({
+                        tessedit_char_whitelist: '0123456789.',
+                        tessedit_pageseg_mode: attempt.psm
+                    });
+                    const res = await worker.recognize(attempt.img);
+                    const num = extractNumber(res.data.text);
+                    console.log(`PSM ${attempt.psm} raw: "${res.data.text}" → extracted: "${num}" conf: ${res.data.confidence}`);
+
+                    if (num.length > bestMatch.length) {
+                        bestMatch = num;
+                        bestConfidence = res.data.confidence;
+                    } else if (num.length === bestMatch.length && res.data.confidence > bestConfidence) {
+                        bestMatch = num;
+                        bestConfidence = res.data.confidence;
                     }
-                } else {
-                    bestMatch = numNormal || numInverted;
                 }
+
+                await worker.terminate();
 
                 if (bestMatch) {
                     if (currentTargetInputId) {
@@ -876,14 +855,13 @@ function openEditModal(index) {
                         if (input) {
                             input.value = bestMatch;
                             input.style.backgroundColor = '#e8f5e9';
-                            setTimeout(() => input.style.backgroundColor = '#fff', 500);
+                            setTimeout(() => input.style.backgroundColor = '#fff', 700);
                         }
                     }
                 } else {
-                    alert('숫자를 인식하지 못했습니다. 더 좁고 정확하게 숫자 영역만 크롭해 주세요.');
+                    alert('숫자를 인식하지 못했습니다.\n이미지를 회전하여 숫자판을 가로로 맞추고, 숫자판 영역만 크롭해 주세요.');
                 }
 
-                await worker.terminate();
 
             } catch (err) {
                 console.error(err);
