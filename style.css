@@ -304,3 +304,65 @@ td input[type="number"] {
 .secondary-button:hover {
     background-color: #e2e8f0;
 }
+
+/* ── New-Meter Row Highlight (2026-6 이후 Wasser Haus) ──────────────────────── */
+tr.new-meter-row {
+    background-color: #f0fff4;  /* 연한 민트 배경 */
+}
+tr.new-meter-row:hover {
+    background-color: #e6ffed;
+}
+tr.new-meter-row td:first-child {
+    color: #276749;
+    font-weight: 700;
+}
+
+/* New-meter td (only the offset-affected column) */
+td.new-meter-td {
+    background-color: #c6f6d5;  /* 약간 진한 민트 - 해당 컬럼 강조 */
+}
+
+/* ── Offset Cell Layout ──────────────────────────────────────────────────────── */
+.offset-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+
+/* Input for new meter value */
+.new-meter-input {
+    width: 90%;
+    padding: 4px;
+    border: 1.5px solid #48bb78;
+    border-radius: 4px;
+    text-align: center;
+    font-family: inherit;
+    font-size: inherit;
+    color: #22543d;
+    background: #f0fff4;
+    font-weight: 600;
+}
+.new-meter-input:focus {
+    outline: none;
+    border-color: #276749;
+    box-shadow: 0 0 0 2px rgba(72, 187, 120, 0.25);
+    background: #fff;
+}
+.new-meter-input::placeholder {
+    color: #a0aec0;
+    font-weight: 400;
+}
+.new-meter-input::-webkit-inner-spin-button,
+.new-meter-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.new-meter-input { -moz-appearance: textfield; appearance: textfield; }
+
+/* Corrected cumulative value shown below the input */
+.offset-corrected {
+    font-size: 0.72rem;
+    color: #276749;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    min-height: 14px;
+}
+

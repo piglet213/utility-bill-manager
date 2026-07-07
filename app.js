@@ -52,7 +52,20 @@ const defaultData = [
     { date: "2025-9", wasser_haus: 871.349, praxis_blau: 2.982, praxis_rot: 2.233, strom_haus: 83719.4, strom_praxis: 64878.867, gas: 23317.771 },
     { date: "2025-10", wasser_haus: 882.854, praxis_blau: 3.018, praxis_rot: 2.273, strom_haus: 83990.7, strom_praxis: 65129.433, gas: 23539.753 },
     { date: "2025-11", wasser_haus: 894.359, praxis_blau: 3.055, praxis_rot: 2.312, strom_haus: 84262.0, strom_praxis: 65380.0, gas: 23761.734 },
-    { date: "2025-12", wasser_haus: 907.126, praxis_blau: 3.079, praxis_rot: 2.362, strom_haus: 84552.7, strom_praxis: 65644.1, gas: 24080.113 }
+    { date: "2025-12", wasser_haus: 907.126, praxis_blau: 3.079, praxis_rot: 2.362, strom_haus: 84552.7, strom_praxis: 65644.1, gas: 24080.113 },
+    // 2026 Data
+    { date: "2026-1", wasser_haus: 920.042, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-2", wasser_haus: 933.511, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-3", wasser_haus: 949.7, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-4", wasser_haus: 966.067, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-5", wasser_haus: 968.053, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-6", wasser_haus: null, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-7", wasser_haus: null, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-8", wasser_haus: null, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-9", wasser_haus: null, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-10", wasser_haus: null, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-11", wasser_haus: null, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null },
+    { date: "2026-12", wasser_haus: null, praxis_blau: null, praxis_rot: null, strom_haus: null, strom_praxis: null, gas: null }
 ];
 
 // Active State - Start with copy of defaultData
@@ -238,31 +251,77 @@ function updateCharts() {
 
 // Function to create an input element
 function createInput(value, rowIndex, key) {
+    const dateStr = rawData[rowIndex].date;
+    const offsetConfig = getOffsetForCell(key, dateStr);
+
+    // ── Offset cell: new-meter input with auto-calculation ────────────────────
+    if (offsetConfig) {
+        return createOffsetInput(value, rowIndex, key, offsetConfig);
+    }
+
+    // ── Standard cell ─────────────────────────────────────────────────────────
     const input = document.createElement('input');
     input.type = 'number';
-    input.step = '0.001'; // Allow decimals
+    input.step = '0.001';
     input.value = value !== null ? value : '';
 
-    // Check if this cell is interpolated
     if (interpolatedCells.has(`${rowIndex}-${key}`)) {
         input.classList.add('interpolated-input');
     }
 
-    input.addEventListener('change', (e) => { // Changed to 'change' to avoid excessive updates during typing
+    input.addEventListener('change', (e) => {
         const val = e.target.value;
-        const newValue = val === '' ? null : parseFloat(val);
-        // If user manually edits an interpolated value, it effectively becomes manual/valid
-        // Re-running performInterpolation will clear the flag if there are no gaps anymore,
-        // or re-calculate neighbors. 
-        rawData[rowIndex][key] = newValue;
-
-        // If the user clears a value, interpolation might kick in again for this cell if surrounded by valid values.
-        // If user enters a value, it's now valid, so it won't be interpolated.
-
+        rawData[rowIndex][key] = val === '' ? null : parseFloat(val);
         updateCharts();
     });
 
     return input;
+}
+
+// Creates a simplified cell for new-meter readings.
+// User types the new meter value → app auto-adds offset → stores adjusted cumulative.
+function createOffsetInput(storedValue, rowIndex, key, offsetConfig) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'offset-cell';
+
+    // Back-calculate new-meter reading from stored adjusted cumulative
+    const newMeterValue = (storedValue !== null && storedValue !== '')
+        ? parseFloat((storedValue - offsetConfig.offset).toFixed(3))
+        : null;
+
+    // Input for new meter reading
+    const newInput = document.createElement('input');
+    newInput.type = 'number';
+    newInput.step = '0.001';
+    newInput.value = newMeterValue !== null ? newMeterValue : '';
+    newInput.className = 'new-meter-input';
+    newInput.placeholder = '새 계량기';
+    newInput.title = `새 계량기 값 입력 (오프셋 +${offsetConfig.offset} 자동 적용)`;
+
+    // Corrected cumulative display (only shown when value exists)
+    const corrected = document.createElement('div');
+    corrected.className = 'offset-corrected';
+    if (storedValue !== null) {
+        corrected.textContent = `≡ ${parseFloat(storedValue).toFixed(3)}`;
+    }
+
+    newInput.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val === '') {
+            rawData[rowIndex][key] = null;
+            corrected.textContent = '';
+        } else {
+            const newMeter = parseFloat(val);
+            const calc = parseFloat((newMeter + offsetConfig.offset).toFixed(3));
+            rawData[rowIndex][key] = calc;
+            corrected.textContent = `≡ ${calc.toFixed(3)}`;
+        }
+        updateCharts();
+    });
+
+    wrapper.appendChild(newInput);
+    wrapper.appendChild(corrected);
+    return wrapper;
 }
 
 // Render Table with Inputs (Filtered by Year)
@@ -279,10 +338,14 @@ function renderTable(year) {
     }
 
     rawData.forEach((row, index) => {
-        // Filter: Only show rows for the selected year
         if (!row.date.startsWith(year)) return;
 
         const tr = document.createElement('tr');
+
+        // Check if this row has any offset-affected key → add row class
+        const keys = ['wasser_haus', 'praxis_blau', 'praxis_rot', 'strom_haus', 'strom_praxis', 'gas'];
+        const hasOffset = keys.some(k => getOffsetForCell(k, row.date) !== null);
+        if (hasOffset) tr.classList.add('new-meter-row');
 
         const dateTd = document.createElement('td');
         dateTd.style.textAlign = 'center';
@@ -290,11 +353,9 @@ function renderTable(year) {
         dateTd.textContent = row.date;
         tr.appendChild(dateTd);
 
-        // Keys to render
-        const keys = ['wasser_haus', 'praxis_blau', 'praxis_rot', 'strom_haus', 'strom_praxis', 'gas'];
-
         keys.forEach(key => {
             const td = document.createElement('td');
+            if (getOffsetForCell(key, row.date)) td.classList.add('new-meter-td');
             td.appendChild(createInput(row[key], index, key));
             tr.appendChild(td);
         });
@@ -437,6 +498,34 @@ Chart.register(avgValuePlugin);
 
 // Persistence Constants
 const STORAGE_KEY = 'UTILITY_DASHBOARD_DATA_V2';
+const OFFSET_STORAGE_KEY = 'UTILITY_METER_OFFSETS_V1';
+
+// ── Meter Replacement Offsets ─────────────────────────────────────────────────
+// Each entry: { key: 'wasser_haus', fromDate: '2026-5', offset: 968.053 }
+let meterOffsets = [];
+
+function saveMeterOffsets() {
+    localStorage.setItem(OFFSET_STORAGE_KEY, JSON.stringify(meterOffsets));
+}
+
+function loadMeterOffsets() {
+    const stored = localStorage.getItem(OFFSET_STORAGE_KEY);
+    if (stored) {
+        try { meterOffsets = JSON.parse(stored); } catch(e) { meterOffsets = []; }
+    }
+}
+
+// Returns the matching offset config for a given key + date, or null
+function getOffsetForCell(key, dateStr) {
+    const [year, month] = dateStr.split('-').map(Number);
+    for (const o of meterOffsets) {
+        const [oy, om] = o.fromDate.split('-').map(Number);
+        if (o.key === key && (year > oy || (year === oy && month >= om))) {
+            return o;
+        }
+    }
+    return null;
+}
 
 // Auto-Save to LocalStorage
 function saveToLocal() {
@@ -446,14 +535,34 @@ function saveToLocal() {
 
 // Load from LocalStorage
 function loadFromLocal() {
+    loadMeterOffsets();
+
+    // Auto-initialize offset for Wasser Haus from 2026-6 (meter replaced May 24, 2026)
+    // Only set once if nothing saved yet, or if wasser_haus key not present
+    const hasWasserOffset = meterOffsets.some(o => o.key === 'wasser_haus');
+    if (!hasWasserOffset) {
+        meterOffsets.push({ key: 'wasser_haus', fromDate: '2026-6', offset: 968.053 });
+        saveMeterOffsets();
+        console.log('Auto-initialized Wasser Haus meter offset (2026-6, +968.053)');
+    }
+
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
         try {
             const parsed = JSON.parse(stored);
             if (Array.isArray(parsed) && parsed.length > 0) {
                 console.log('Loading local data via merge...');
-                // Merge loaded data into the default structure (restoring defaults if persisted data had gaps)
                 mergeData(parsed);
+
+                // Migration: fix 2026-5 wasser_haus if it contains wrong new-meter value
+                // (value should be the old meter's last cumulative reading ~968, not the new meter reading ~8)
+                const may2026 = rawData.find(d => d.date === '2026-5');
+                if (may2026 && may2026.wasser_haus !== null && may2026.wasser_haus < 100) {
+                    console.log(`Migration: correcting 2026-5 wasser_haus from ${may2026.wasser_haus} → 968.053`);
+                    may2026.wasser_haus = 968.053;
+                    saveToLocal();
+                }
+
                 return true;
             }
         } catch (e) {
@@ -741,12 +850,14 @@ function init() {
 
     performInterpolation(); // Initial check
 
-    // Set initial year (default to 2025 if available, else first)
+    // Set initial year (default to most recent year available)
     const years = [...new Set(rawData.map(d => d.date.split('-')[0]))];
-    if (years.includes('2025')) {
+    if (years.includes('2026')) {
+        currentYear = '2026';
+    } else if (years.includes('2025')) {
         currentYear = '2025';
     } else if (years.length > 0) {
-        currentYear = years[0];
+        currentYear = years[years.length - 1];
     }
 
     renderTabs();
@@ -767,6 +878,46 @@ function init() {
     const fileInput = document.getElementById('fileInput');
     document.getElementById('loadBtn').addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', importData);
+
+    // ── Meter Offset Modal ────────────────────────────────────────────────────
+    const offsetBtn    = document.getElementById('offsetBtn');
+    const offsetModal  = document.getElementById('offsetModal');
+    const offsetClose  = document.getElementById('offsetModalClose');
+    const offsetForm   = document.getElementById('offsetForm');
+
+    if (offsetBtn && offsetModal) {
+        offsetBtn.addEventListener('click', () => {
+            renderOffsetList();
+            offsetModal.style.display = 'flex';
+        });
+        offsetClose.addEventListener('click', () => {
+            offsetModal.style.display = 'none';
+        });
+        offsetModal.addEventListener('click', (e) => {
+            if (e.target === offsetModal) offsetModal.style.display = 'none';
+        });
+    }
+
+    if (offsetForm) {
+        offsetForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const key      = document.getElementById('offsetKey').value;
+            const fromDate = document.getElementById('offsetFromDate').value.trim();
+            const offset   = parseFloat(document.getElementById('offsetValue').value);
+
+            if (!fromDate || isNaN(offset)) return;
+
+            // Remove any existing entry for the same key (one offset per column)
+            const idx = meterOffsets.findIndex(o => o.key === key);
+            if (idx !== -1) meterOffsets.splice(idx, 1);
+
+            meterOffsets.push({ key, fromDate, offset });
+            saveMeterOffsets();
+            renderOffsetList();
+            renderTable(currentYear);  // Re-render so offset cells appear
+            offsetForm.reset();
+        });
+    }
 
     // Logout Logic
     const logoutBtn = document.getElementById('logoutBtn');
@@ -794,6 +945,48 @@ function init() {
             }
         };
     }
+
+    // ── renderOffsetList ──────────────────────────────────────────────────────
+    // Renders the current meterOffsets into the #offsetList element inside the modal
+    window.renderOffsetList = function () {
+        const list = document.getElementById('offsetList');
+        if (!list) return;
+        list.innerHTML = '';
+
+        const keyLabels = {
+            wasser_haus: 'Wasser Haus', praxis_blau: 'Praxis Blau',
+            praxis_rot: 'Praxis Rot',   strom_haus: 'Strom Haus',
+            strom_praxis: 'Strom Praxis', gas: 'Gas'
+        };
+
+        if (meterOffsets.length === 0) {
+            list.innerHTML = '<p style="color:#718096;font-size:0.85rem;">등록된 계량기 교체 없음</p>';
+            return;
+        }
+
+        meterOffsets.forEach((o, i) => {
+            const row = document.createElement('div');
+            row.className = 'offset-list-row';
+            row.innerHTML = `
+                <span class="offset-list-info">
+                    <strong>${keyLabels[o.key] || o.key}</strong>
+                    &nbsp;|&nbsp; ${o.fromDate} 부터
+                    &nbsp;|&nbsp; +${o.offset}
+                </span>
+                <button class="offset-delete-btn" data-idx="${i}" title="삭제">✕</button>`;
+            list.appendChild(row);
+        });
+
+        list.querySelectorAll('.offset-delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.idx);
+                meterOffsets.splice(idx, 1);
+                saveMeterOffsets();
+                renderOffsetList();
+                renderTable(currentYear);
+            });
+        });
+    };
 
     // Helper to create average dataset config
     const createAvgDataset = (label, color) => ({
