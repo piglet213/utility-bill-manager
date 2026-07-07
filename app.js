@@ -289,33 +289,41 @@ function createOffsetInput(storedValue, rowIndex, key, offsetConfig) {
         ? parseFloat((storedValue - offsetConfig.offset).toFixed(3))
         : null;
 
-    // Input for new meter reading
+    // Input for new meter reading (only the new-meter value is shown in the table)
     const newInput = document.createElement('input');
     newInput.type = 'number';
     newInput.step = '0.001';
     newInput.value = newMeterValue !== null ? newMeterValue : '';
     newInput.className = 'new-meter-input';
     newInput.placeholder = '새 계량기';
-    newInput.title = `새 계량기 값 입력 (오프셋 +${offsetConfig.offset} 자동 적용)`;
 
-    // Corrected cumulative display (only shown when value exists)
+    // Corrected cumulative value — hidden by default, revealed on hover
     const corrected = document.createElement('div');
     corrected.className = 'offset-corrected';
-    if (storedValue !== null) {
-        corrected.textContent = `≡ ${parseFloat(storedValue).toFixed(3)}`;
+
+    // Sync the hover-only corrected display + tooltip with the stored (adjusted) value
+    function refreshCorrected() {
+        const cur = rawData[rowIndex][key];
+        if (cur !== null && cur !== undefined && cur !== '') {
+            const adj = parseFloat(cur).toFixed(3);
+            corrected.textContent = `보정값 ≡ ${adj}`;
+            newInput.title = `옵셋(+${offsetConfig.offset}) 적용 보정값: ${adj}`;
+        } else {
+            corrected.textContent = '';
+            newInput.title = `새 계량기 값 입력 (옵셋 +${offsetConfig.offset} 자동 적용)`;
+        }
     }
+    refreshCorrected();
 
     newInput.addEventListener('change', (e) => {
         const val = e.target.value;
         if (val === '') {
             rawData[rowIndex][key] = null;
-            corrected.textContent = '';
         } else {
             const newMeter = parseFloat(val);
-            const calc = parseFloat((newMeter + offsetConfig.offset).toFixed(3));
-            rawData[rowIndex][key] = calc;
-            corrected.textContent = `≡ ${calc.toFixed(3)}`;
+            rawData[rowIndex][key] = parseFloat((newMeter + offsetConfig.offset).toFixed(3));
         }
+        refreshCorrected();
         updateCharts();
     });
 
@@ -537,13 +545,26 @@ function saveToLocal() {
 function loadFromLocal() {
     loadMeterOffsets();
 
-    // Auto-initialize offset for Wasser Haus from 2026-6 (meter replaced May 24, 2026)
+    // Auto-initialize offset for Wasser Haus from 2026-5 (new meter installed May 2026)
     // Only set once if nothing saved yet, or if wasser_haus key not present
     const hasWasserOffset = meterOffsets.some(o => o.key === 'wasser_haus');
     if (!hasWasserOffset) {
-        meterOffsets.push({ key: 'wasser_haus', fromDate: '2026-6', offset: 968.053 });
+        meterOffsets.push({ key: 'wasser_haus', fromDate: '2026-5', offset: 968.053 });
         saveMeterOffsets();
-        console.log('Auto-initialized Wasser Haus meter offset (2026-6, +968.053)');
+        console.log('Auto-initialized Wasser Haus meter offset (2026-5, +968.053)');
+    } else {
+        // Migration: move any previously-saved offset start (2026-6) to 2026-5
+        let changed = false;
+        meterOffsets.forEach(o => {
+            if (o.key === 'wasser_haus' && o.fromDate === '2026-6') {
+                o.fromDate = '2026-5';
+                changed = true;
+            }
+        });
+        if (changed) {
+            saveMeterOffsets();
+            console.log('Migrated Wasser Haus offset start 2026-6 → 2026-5');
+        }
     }
 
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -553,15 +574,6 @@ function loadFromLocal() {
             if (Array.isArray(parsed) && parsed.length > 0) {
                 console.log('Loading local data via merge...');
                 mergeData(parsed);
-
-                // Migration: fix 2026-5 wasser_haus if it contains wrong new-meter value
-                // (value should be the old meter's last cumulative reading ~968, not the new meter reading ~8)
-                const may2026 = rawData.find(d => d.date === '2026-5');
-                if (may2026 && may2026.wasser_haus !== null && may2026.wasser_haus < 100) {
-                    console.log(`Migration: correcting 2026-5 wasser_haus from ${may2026.wasser_haus} → 968.053`);
-                    may2026.wasser_haus = 968.053;
-                    saveToLocal();
-                }
 
                 return true;
             }

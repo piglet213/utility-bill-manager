@@ -357,12 +357,24 @@ td.new-meter-td {
 .new-meter-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .new-meter-input { -moz-appearance: textfield; appearance: textfield; }
 
-/* Corrected cumulative value shown below the input */
+/* Corrected cumulative value — hidden by default, revealed on hover */
 .offset-corrected {
     font-size: 0.72rem;
     color: #276749;
     font-weight: 700;
     letter-spacing: 0.01em;
-    min-height: 14px;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: max-height 0.15s ease, opacity 0.15s ease;
 }
-
+
+/* Reveal the corrected value when hovering (or focusing) the offset cell */
+.new-meter-td:hover .offset-corrected,
+.offset-cell:hover .offset-corrected,
+.new-meter-input:focus + .offset-corrected {
+    max-height: 20px;
+    opacity: 1;
+}
+
